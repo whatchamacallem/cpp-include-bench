@@ -1,0 +1,5 @@
+*.txt
+*.h
+*.cpp
+*.pch
+*.gch
