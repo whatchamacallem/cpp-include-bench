@@ -3,3 +3,9 @@
 *.cpp
 *.pch
 *.gch
+*.cppm
+*.gcm
+*.pcm
+*.o
+gcm.cache/
+verify_*
