@@ -12,13 +12,39 @@ RUNS=11
 
 GNU_MODULES_JSON=$(g++ -print-file-name=libstdc++.modules.json)
 GNU_STD=$(python3 -c "
-import json
-with open('$GNU_MODULES_JSON') as f:
+import json, os
+json_path = '$GNU_MODULES_JSON'
+with open(json_path) as f:
     d = json.load(f)
-print(next(m['source-path'] for m in d['modules'] if m['logical-name'] == 'std'))
+src = next(m['source-path'] for m in d['modules'] if m['logical-name'] == 'std')
+print(os.path.normpath(os.path.join(os.path.dirname(os.path.realpath(json_path)), src)))
 ")
-LLVM_PREFIX=$(dirname "$(dirname "$(realpath "$(command -v clang++)")")")
-LLVM_STD="$LLVM_PREFIX/share/libc++/v1/std.cppm"
+LLVM_STD=$(python3 -c "
+import subprocess, os, glob
+
+# Try 1: clang++ -print-file-name for libc++.modules.json
+r = subprocess.run(['clang++', '-stdlib=libc++', '-print-file-name=libc++.modules.json'],
+                   capture_output=True, text=True)
+json_path = r.stdout.strip()
+if os.path.isabs(json_path) and os.path.exists(json_path):
+    import json
+    with open(json_path) as f:
+        d = json.load(f)
+    src = next(m['source-path'] for m in d['modules'] if m['logical-name'] == 'std')
+    print(os.path.normpath(os.path.join(os.path.dirname(os.path.realpath(json_path)), src)))
+    exit()
+
+# Try 2: search installed LLVM directories, highest version first
+dirs = sorted(glob.glob('/usr/lib/llvm-*'),
+              key=lambda p: int(p.rsplit('-', 1)[-1]) if p.rsplit('-', 1)[-1].isdigit() else 0,
+              reverse=True)
+for base in dirs:
+    p = os.path.join(base, 'share', 'libc++', 'v1', 'std.cppm')
+    if os.path.exists(p):
+        print(p); exit()
+
+raise RuntimeError('LLVM std.cppm not found')
+")
 
 printf 'GNU  std module: %s\n' "$GNU_STD" >&2
 printf 'LLVM std module: %s\n' "$LLVM_STD" >&2
